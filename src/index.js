@@ -40,6 +40,17 @@ const App = () => {
   const handleNoteChange = (event) => {
     setNewNote(event.target.value)
   }
+
+  const showTags = (n, tags) => {
+    return n.tagIds
+      .map(id => tags.find(t => t.id === id).value).join()
+  }
+  const getNotes = (notes, tags) => {
+    return tags.filter(t => t.visible).length === 0 ?
+      notes :
+      notes
+        .filter(n => n.tagIds.some(t => tags.find(e => e.id === t).visible))
+  }
   return (
     <div>
       <h1>Test</h1>
@@ -65,10 +76,8 @@ const App = () => {
         <button onClick={addNote}>Add Note</button>
       </form>
       <ul>
-        {(tags.filter(t => t.visible).length === 0 ? notes :
-          notes
-            .filter(n => n.tagIds.some(t => tags.find(e => e.id === t).visible)))
-          .map(n => <li key={n.id}>[{n.tagIds.map(id=>tags.find(t=>t.id === id).value).join()}] ID: {n.id} {n.value}</li>)}
+        {getNotes(notes, tags)
+          .map(n => <li key={n.id}>[{showTags(n, tags)}] ID: {n.id} {n.value}</li>)}
       </ul>
     </div>
   )
