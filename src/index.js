@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import axios from 'axios';
 
 const TagSelector = ({ tags, setTags, isTagSelected, setTagSelected }) => {
 
@@ -23,20 +24,58 @@ const TagSelector = ({ tags, setTags, isTagSelected, setTagSelected }) => {
 }
 
 const App = () => {
-  const [tags, setTags] = useState([
-    { id: 1, value: "Ticket 1", visible: false, selected: false },
-    { id: 2, value: "Ticket 2", visible: false, selected: false }])
+
+  const [tags, setTags] = useState([])
+  const [newTag, setNewTag] = useState("")
+
 
   const [notes, setNotes] = useState([])
   const [newNote, setNewNote] = useState("")
 
+
+  useEffect(() => {
+    console.log("load tags")
+    axios.get("http://localhost:3001/tags")
+      .then(response => {
+        console.log("promise fulfilled")
+        setTags(response.data)
+      })
+  }, [])
+
+  useEffect(() => {
+    console.log("load notes")
+    axios.get("http://localhost:3001/notes")
+      .then(response => {
+        console.log("note promise fulfilled")
+        setNotes(response.data.map(n => {
+          return {
+            ...n,
+            date: new Date(n.date)
+          }
+        }))
+      })
+  }, [])
+
   const addNote = e => {
     e.preventDefault()
-    const newId = notes.length === 0 ? 0 : Math.max(...notes.map(n => n.id)) + 1
-    setNotes(notes.concat({ value: newNote, id: newId, tagIds: tags.filter(t => t.selected).map(t => t.id) }))
-    setNewNote("")
-  }
+    if (newNote !== "") {
 
+      const newNoteObject = {
+        value: newNote,
+        tagIds: tags.filter(t => t.selected).map(t => t.id),
+        date: new Date()
+      }
+      axios.post("http://localhost:3001/notes", newNoteObject)
+        .then(response => {
+          const noteResult = response.data
+          setNotes(notes.concat({
+            ...noteResult,
+            date: new Date(noteResult.date)
+          }))
+          setNewNote("")
+        })
+    }
+  }
   const handleNoteChange = (event) => {
     setNewNote(event.target.value)
   }
@@ -46,22 +85,60 @@ const App = () => {
       .map(id => tags.find(t => t.id === id).value).join()
   }
   const getNotes = (notes, tags) => {
+    const sortNotesReversed = n => {
+      return [...n].sort((a, b) => {
+        if (a.date === b.date) {
+          return 0
+        }
+        if (a.date > b.date) {
+          return -1
+        }
+        return 1
+      })
+    }
+    const sortedNotes = sortNotesReversed(notes)
     return tags.filter(t => t.visible).length === 0 ?
-      notes :
-      notes
+      sortedNotes :
+      sortedNotes
         .filter(n => n.tagIds.some(t => tags.find(e => e.id === t).visible))
   }
+
+  const addTag = e => {
+    e.preventDefault()
+    const newTagObject = {
+      value: newTag,
+      visible: false,
+      selected: false
+    }
+    axios.post("http://localhost:3001/tags", newTagObject)
+      .then(response => {
+        setTags(tags.concat(response.data))
+        setNewTag("")
+      })
+  }
+  const formatDate = d => {
+
+    return `${d.getDate()}.${d.getMonth()}.${d.getFullYear()} ${d.getHours()}:${d.getMinutes()}`
+  }
+
+
   return (
     <div>
       <h1>Test</h1>
-      <h2>Select</h2>
+      <h2>Add Tag</h2>
+      <form>
+        <input value={newTag} onChange={e => setNewTag(e.target.value)} />
+        <button onClick={addTag}>Add Tag</button>
+      </form>
+
+      <h2>Select Tags</h2>
       <TagSelector
         tags={tags}
         setTags={setTags}
         isTagSelected={t => t.selected}
         setTagSelected={t => { return { ...t, selected: !t.selected } }}
       />
-      <h2>Visible</h2>
+      <h2>Show Tags</h2>
       <TagSelector
         tags={tags}
         setTags={setTags}
@@ -77,7 +154,7 @@ const App = () => {
       </form>
       <ul>
         {getNotes(notes, tags)
-          .map(n => <li key={n.id}>[{showTags(n, tags)}] ID: {n.id} {n.value}</li>)}
+          .map(n => <li key={n.id}>{formatDate(n.date)} [{showTags(n, tags)}] ID: {n.id} {n.value}</li>)}
       </ul>
     </div>
   )
